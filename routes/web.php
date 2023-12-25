@@ -1,6 +1,6 @@
 <?php
 
-//echo 'reached here web'; exit;
+#echo 'reached here web'; exit;
 
 use Illuminate\Support\Facades\Route;
 

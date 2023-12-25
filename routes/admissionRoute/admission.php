@@ -1,6 +1,6 @@
 <?php
 
-
+#echo 'entered here routes'; exit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\admission\AdmissionController;
@@ -18,6 +18,7 @@ Route::post('/register',[AuthController::class,'register']);
 
 Route::controller(AdmissionController::class)->group(function(){
     Route::post('register_user','register_user');
+    Route::post('verify_email','verify_email');
 });
 
 Route::group(['middleware' => ['auth:sanctum']],function(){

@@ -158,6 +158,24 @@ class AdmissionController extends Controller
     }
     return implode($pass); //turn the array into a string
   }
+
+  public function verify_email(Request $request){
+    return response()->json([
+      'status' => 'success',
+      'message' => 'Please Contact Admin',
+     ],200);
+    try {
+      print_r($request); exit;
+      //code...
+    } catch (QueryException $ex) {
+       return response()->json([
+        'status' => false,
+        'message' => 'Please Contact Admin',
+        'errors' => $ex->getMessage()
+       ],200);
+    }
+
+  }
 }
 
 ?>
