@@ -174,8 +174,125 @@ class AdmissionController extends Controller
         'errors' => $ex->getMessage()
        ],200);
     }
-
   }
-}
+
+  public function apply_program(Request $request){
+
+  try {
+
+        $validateEmail = validator::make($request->all(),
+          [
+              'email' => 'required|email'
+          ]
+        );
+        if ($validateEmail->fails()) {
+          return response()->json([
+            'status' => false,
+            'message' => 'Please Enter Valid Email ID'
+          ],200);
+          # code...
+        }
+        else{
+          $email = $request->email;
+          $count_prog_error = 0;
+          $candidate_type_query = DB::select("SELECT p.appl_type FROM adm_phdef_registration p WHERE p.email='".$email."'");
+          if (!empty($candidate_type_query)) {
+            $data['candidate_type'] = $candidate_type_query;
+          }
+          $get_reg_no = DB::select("select g.registration_no from adm_phdef_registration g where g.email='".$email."'");
+          $get_reg_details=DB::select("select g.* from adm_phdef_registration g where g.email='".$email."'");
+        }
+        $gate_paper_code_query = DB::select("SELECT g.* FROM adm_phdef_gate_paper g");
+        if (!empty($gate_paper_code_query)) {
+          $data['gate_paper_code']=$gate_paper_code_query;
+        }
+
+        if(!empty($get_reg_details[0]->color_blind))
+        {
+
+          if($get_reg_details[0]->color_blind=='Y' And $get_reg_details[0]->pwd=='Y')
+          {
+            $get_prog_list_of_btech_without_pwd_colorblind = DB::select("SELECT t.* FROM adm_phdef_program_ms t WHERE t.pwd  IS NULL and t.color_blind IS NULL");
+            if (!empty($get_prog_list_of_btech_without_pwd_colorblind)) {
+              $data['btech_paper'] = $get_prog_list_of_btech_without_pwd_colorblind;
+            }
+            else {
+              $count_prog_error++;
+            }
+          }
+
+          if($get_reg_details[0]->color_blind=='Y' And $get_reg_details[0]->pwd=='N')
+          {
+            $get_programme_list_of_btech_without_colorblind = DB::select("SELECT t.* FROM adm_phdef_program_ms t WHERE t.color_blind IS NULL");
+            if (!empty($get_programme_list_of_btech_without_colorblind)) {
+              $data['btech_paper']=$get_programme_list_of_btech_without_colorblind;
+            }
+            else{
+              $count_prog_error++;
+            }
+          }
+
+          if($get_reg_details[0]->color_blind=='N' And $get_reg_details[0]->pwd=='N')
+          {
+            $get_prog_list_of_btech = DB::select("SELECT t.* FROM adm_phdef_program_ms t");
+            if (!empty($get_prog_list_of_btech)) {
+              $data['btech_paper']=$get_prog_list_of_btech;
+            }
+            else {
+              $count_prog_error++;
+            }
+          }
+
+          if($get_reg_details[0]->color_blind=='N' And $get_reg_details[0]->pwd=='Y')
+          {
+            $get_prog_list_of_btech_without_pwd = DB::select("SELECT t.* FROM adm_phdef_program_ms t WHERE t.pwd  IS NULL");
+            if (!empty($get_prog_list_of_btech_without_pwd)) {
+              $data['btech_paper']=$get_prog_list_of_btech_without_pwd;
+            }
+            else {
+              $count_prog_error++;
+            }
+          }
+
+        }
+        else {
+          return response()->json([
+            'status' => false,
+            'message' => 'Unable to fetch Candidate registration Details'
+          ],200);
+        }
+
+        if ($count_prog_error > 0) {
+           return response()->json([
+             'status' => false,
+             'message' => 'Unable to fetch relevant program details !'
+           ],200);
+        }
+
+        $app_fill_details = DB::select("select * from adm_phdef_reg_appl_program g where g.registration_no='".$get_reg_no."'");
+        if (!empty($app_fill_details)) {
+          $data['fill_appl_details'] = $app_fill_details;
+        }
+        else{
+          return response()->json([
+            'status' => false,
+            'message' => 'No Program Details Available'
+          ],200);
+        }
+
+        $data['val']="H";
+        $data['remove_apply']='apply_remove';
+
+        //code...
+        } catch (QueryException $ex) {
+          return response()->json([
+            'status' => 'false',
+            'message' => 'Please Contact Admin',
+            'errors' => $ex->getMessage()
+          ],200);
+        }
+    }
+
+    }
 
 ?>
