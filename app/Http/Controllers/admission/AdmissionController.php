@@ -26,24 +26,37 @@ class AdmissionController extends Controller
 
     }
 
+    public $table_name="adm_phdef_registration";
+    public $adm_rapl_pro="adm_phdef_reg_appl_program";
+    public $dept="adm_phdef_dept";
+    public $program="adm_phdef_program_ms";
+    public $appl_ms="adm_phdef_appl_ms";
+    public $email_log="adm_phdef_email_log";
+
     public function register_user(Request $request){
 
      try{
 
+      DB::enableQueryLog();
+
+      // Your Eloquent or Query Builder code here
+
+
       $validateUser = Validator::make($request->all(),
             [
-                'firstname' => 'required',
-                'middlename' => 'required',
-                'lastname' => 'required',
-                'pwd' => 'required',
-                'category' => 'required',
+                'salutation' => 'required|alpha_num:ascii',
+                'firstname' => 'required|alpha_num:ascii',
+                'middlename' => 'nullable|alpha_num:ascii',
+                'lastname' => 'nullable|alpha_num:ascii',
+                'pwd' => 'required|alpha_num:ascii',
+                'category' => 'required|alpha_num:ascii',
                 'email' => 'required|email',
                 'mobile' => 'required|regex:/[0-9]{10}/',
-                'gender' => 'required',
-                'dob' => 'required',
-                'fathername' => 'required',
-                'bloodgroup' => 'required',
-                'colorblindness' => 'required'
+                'gender' => 'required|regex:/^[a-zA-Z]*$/',
+                'dob' => 'required|date_format:d-m-Y',
+                'fathername' => 'nullable|alpha_num:ascii',
+                'bloodgroup' => 'required|regex:/^[a-zA-Z\+-]*$/',
+                'colorblindness' => 'required|alpha_num:ascii'
             ]);
 
             if($validateUser->fails()){
@@ -53,35 +66,45 @@ class AdmissionController extends Controller
                   'errors' => $validateUser->errors()
               ], 200);
           }
-
           else {
-              $first_name = $request['firstname'];
-              $middle_name = $request['middlename'];
-              $last_name = $request['lastname'];
-              $pwd = $request['pwd'];
-              $category = $request['category'];
-              $email = $request['email'];
-              $mobile = $request['mobile'];
-              $gender = $request['gender'];
-              $dob = $request['dob'];
-              $father_name = $request['fathername'];
-              $blood_group = $request['bloodgroup'];
-              $c_blind = $request['colorblindness'];
+              $salutation = trim($request['salutation']);
+              $first_name = trim($request['firstname']);
+              $middle_name = trim($request['middlename']);
+              $last_name = trim($request['lastname']);
+              $pwd = trim($request['pwd']);
+              $category = trim($request['category']);
+              $email = trim($request['email']);
+              $mobile = trim($request['mobile']);
+              $gender = trim($request['gender']);
+              $dob = date('d-m-Y', strtotime($request['dob']));
+              $father_name = trim($request['fathername']);
+              $blood_group = trim($request['bloodgroup']);
+              $c_blind = trim($request['colorblindness']);
               $appl_type = 'Full time';
 
-              $m_email = DB::table('adm_phd_registration')->where('email',$email)->first();
+              $m_email = DB::table('adm_phdef_registration')->where('email',$email)->first();
               if ($m_email) {
                 return response()->json([
                   'status' => false,
                   'message' => 'Registration already done using same Email !',
+                  'error' => 'Email Already Exists'
               ],200);
               }
 
-              $m_mobile = DB::table('adm_phd_registration')->where('mobile',$mobile)->first();
-              if ($m_email) {
+              if ($c_blind == '') {
+                return response()->json([
+                  'status' => false,
+                  'message' => 'Color Blindness/Uniocularity field is mandatory!',
+                  'error' => 'Color Blindness/Uniocularity'
+                ]);
+              }
+
+              $m_mobile = DB::table('adm_phdef_registration')->where('mobile',$mobile)->first();
+              if ($m_mobile) {
                 return response()->json([
                   'status' => false,
                   'message' => 'Registration already done using same Mobile !',
+                  'error' => 'Mobile Already Exists'
               ],200);
               }
 
@@ -93,8 +116,9 @@ class AdmissionController extends Controller
               //$year = 22;
               $num = sprintf("%05d", $maxid);
               $password = $this->randomPassword();
-              $registration_no = 'IITISMWDR' . $year . $num;
+              $registration_no = 'IITISMDREF' . $year . $num;
               $values = array(
+                'salutation' => $salutation,
                 'appl_type' => $appl_type,
                 'first_name' => $first_name,
                 'middle_name' => $middle_name,
@@ -115,17 +139,45 @@ class AdmissionController extends Controller
               );
 
               $name = $first_name . " " . $middle_name . " " . $last_name;
-
               /* send mail using smtp */
                $email_encode = rawurlencode($email);
                $link = "http://localhost:3000/admission/phd/verify_email/" . $email_encode;
                $data = ['registration_no' => $registration_no,'password' => $password,'link' => $link];
-               $user['to'] = 'ajanta.au@iitism.ac.in';
-               $mail_response = Mail::send('mail',$data,function($messages) use ($user){
+               $user['to'] = 'testiitism@gmail.com';
+               try {
+                   /* mail function start here */
+                  $mail_response = Mail::send('mail',$data,function($messages) use ($user){
                   $messages->to($user['to']);
                   $messages->subject('Checking mail sent');
-               });
-               echo 'echo mail response'.$mail_response;
+                  $messages->from('noreply-phd@iitism.ac.in');
+                  });
+                  /* mail function end here */
+                  $time_date = date("M,d,Y h:i:s A");
+                  $upval = array(
+                    'ver_mail_sent' => 'Y',
+                    'ver_mail_sent_date_time' => $time_date
+                  );
+                  $emlog = array(
+                    'registration_no' => $registration_no,
+                    'email_type' => 'Link verification',
+                    'email_from' => 'Noreply-phd@iitism.ac.in',
+                    'email_to' => $email,
+                    'sent_date' => $time_date,
+                    'status' => 1,
+                    'created_by' => $email,
+                  );
+
+                  $result = DB::table($this->table_name)->insert($values);
+                  $lastQuery = DB::getQueryLog();
+                  $lastQuery = end($lastQuery);
+                  dd($lastQuery);
+
+                  $msgok = DB::table($this->email_log)->insert($emlog);
+                  $update_sendmail = DB::table($this->table_name)->where('email',$email)->update($upval);
+
+              } catch (\Exception $e) {
+                 echo $e->getMessage();
+               }
               /* send mail using smtp */
             }
             else {
