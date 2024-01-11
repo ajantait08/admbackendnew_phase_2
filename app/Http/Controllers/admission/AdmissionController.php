@@ -45,17 +45,17 @@ class AdmissionController extends Controller
       $validateUser = Validator::make($request->all(),
             [
                 'salutation' => 'required|alpha_num:ascii',
-                'firstname' => 'required|alpha_num:ascii',
-                'middlename' => 'nullable|alpha_num:ascii',
-                'lastname' => 'nullable|alpha_num:ascii',
+                'first_name' => 'required|alpha_num:ascii',
+                'middle_name' => 'nullable|alpha_num:ascii',
+                'last_name' => 'nullable|alpha_num:ascii',
                 'pwd' => 'required|alpha_num:ascii',
                 'category' => 'required|alpha_num:ascii',
-                'email' => 'required|email',
-                'mobile' => 'required|regex:/[0-9]{10}/',
+                'email' => 'required|email|unique:adm_phdef_registration,email',
+                'mobile' => 'required|regex:/[0-9]{10}/|unique:adm_phdef_registration,mobile',
                 'gender' => 'required|regex:/^[a-zA-Z]*$/',
                 'dob' => 'required|date_format:d-m-Y',
-                'fathername' => 'nullable|alpha_num:ascii',
-                'bloodgroup' => 'required|regex:/^[a-zA-Z\+-]*$/',
+                'father_name' => 'nullable|regex:/^[a-zA-Z0-9\s\.]*$/',
+                'blood_group' => 'required|regex:/^[a-zA-Z\+-]*$/',
                 'colorblindness' => 'required|alpha_num:ascii'
             ]);
 
@@ -68,17 +68,17 @@ class AdmissionController extends Controller
           }
           else {
               $salutation = trim($request['salutation']);
-              $first_name = trim($request['firstname']);
-              $middle_name = trim($request['middlename']);
-              $last_name = trim($request['lastname']);
+              $first_name = trim($request['first_name']);
+              $middle_name = trim($request['middle_name']);
+              $last_name = trim($request['last_name']);
               $pwd = trim($request['pwd']);
               $category = trim($request['category']);
               $email = trim($request['email']);
               $mobile = trim($request['mobile']);
               $gender = trim($request['gender']);
               $dob = date('d-m-Y', strtotime($request['dob']));
-              $father_name = trim($request['fathername']);
-              $blood_group = trim($request['bloodgroup']);
+              $father_name = trim($request['father_name']);
+              $blood_group = trim($request['blood_group']);
               $c_blind = trim($request['colorblindness']);
               $appl_type = 'Full time';
 
@@ -96,7 +96,7 @@ class AdmissionController extends Controller
                   'status' => false,
                   'message' => 'Color Blindness/Uniocularity field is mandatory!',
                   'error' => 'Color Blindness/Uniocularity'
-                ]);
+                ],200);
               }
 
               $m_mobile = DB::table('adm_phdef_registration')->where('mobile',$mobile)->first();
@@ -166,15 +166,17 @@ class AdmissionController extends Controller
                     'status' => 1,
                     'created_by' => $email,
                   );
+                  try {
+                    $result = DB::table($this->table_name)->insert($values);
+                  } catch (QueryException $ex) {
+                    echo $ex->getMessage();
+                  }
 
-                  $result = DB::table($this->table_name)->insert($values);
-                  $lastQuery = DB::getQueryLog();
-                  $lastQuery = end($lastQuery);
-                  dd($lastQuery);
-
+                  // $lastQuery = DB::getQueryLog();
+                  // $lastQuery = end($lastQuery);
+                  // dd($lastQuery);
                   $msgok = DB::table($this->email_log)->insert($emlog);
                   $update_sendmail = DB::table($this->table_name)->where('email',$email)->update($upval);
-
               } catch (\Exception $e) {
                  echo $e->getMessage();
                }
