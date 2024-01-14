@@ -108,7 +108,7 @@ class AdmissionController extends Controller
               ],200);
               }
 
-              $get_details_reg = DB::select('SELECT MAX(id) AS `maxid` FROM `adm_phd_registration`');
+              $get_details_reg = DB::select('SELECT MAX(id) AS `maxid` FROM `adm_phdef_registration`');
               if (!empty($get_details_reg)) {
               $maxid = $get_details_reg[0]->maxid;
               $nemax = $maxid + 1;
@@ -139,13 +139,22 @@ class AdmissionController extends Controller
               );
 
               $name = $first_name . " " . $middle_name . " " . $last_name;
-              /* send mail using smtp */
-               $email_encode = rawurlencode($email);
-               $link = "http://localhost:3000/admission/phd/verify_email/" . $email_encode;
-               $data = ['registration_no' => $registration_no,'password' => $password,'link' => $link];
-               $user['to'] = 'testiitism@gmail.com';
+              $user = User::create([
+                'registration_no' => $registration_no,
+                'name' => $name,
+                'email' => $email,
+                'password' => Hash::make($password)
+              ]);
+
+              $token = $user->createToken('myadmapptoken')->plainTextToken;
+
                try {
+                    /* send mail using smtp */
                    /* mail function start here */
+                  $email_encode = rawurlencode($email);
+                  $link = "http://localhost:3000/admission/phd/verify_email/" . $email_encode;
+                  $data = ['registration_no' => $registration_no,'password' => $password,'link' => $link];
+                  $user['to'] = 'ajanta.au@iitism.ac.in';
                   $mail_response = Mail::send('mail',$data,function($messages) use ($user){
                   $messages->to($user['to']);
                   $messages->subject('Checking mail sent');
@@ -166,19 +175,26 @@ class AdmissionController extends Controller
                     'status' => 1,
                     'created_by' => $email,
                   );
-                  try {
-                    $result = DB::table($this->table_name)->insert($values);
-                  } catch (QueryException $ex) {
-                    echo $ex->getMessage();
-                  }
+
+                  $result = DB::table($this->table_name)->insert($values);
 
                   // $lastQuery = DB::getQueryLog();
                   // $lastQuery = end($lastQuery);
                   // dd($lastQuery);
                   $msgok = DB::table($this->email_log)->insert($emlog);
                   $update_sendmail = DB::table($this->table_name)->where('email',$email)->update($upval);
+                  return response()->json([
+                    'status' => true,
+                    'message' => 'Registration Successful',
+                    'token' => $token
+                ],200);
+
               } catch (\Exception $e) {
-                 echo $e->getMessage();
+                return response()->json([
+                  'status' => false,
+                  'message' => 'Please Contact Admin',
+                  'errors' => $ex->getMessage()
+              ],200);
                }
               /* send mail using smtp */
             }
