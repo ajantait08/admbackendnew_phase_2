@@ -111,7 +111,7 @@ class AdmissionController extends Controller
               ],200);
               }
 
-              $get_details_reg = DB::select('SELECT MAX(id) AS `maxid` FROM `adm_phd_registration`');
+              $get_details_reg = DB::select('SELECT MAX(id) AS `maxid` FROM `adm_phdef_registration`');
               if (!empty($get_details_reg)) {
               $maxid = $get_details_reg[0]->maxid;
               $nemax = $maxid + 1;
@@ -209,20 +209,26 @@ class AdmissionController extends Controller
                     $result = DB::table($this->table_name)->insert($values);
                     $msgok = DB::table($this->email_log)->insert($emlog);
                     $update_sendmail = DB::table($this->table_name)->where('email',$email)->update($upval);
+                    return response()->json([
+                        'status' => true,
+                        'message' => 'Registration Successful',
+                        'registration_no' => $registration_no,
+                        'token' => $token
+                    ],200);
                     } catch (QueryException $ex) {
                       $database_error_log = array(
                         'error_type' => 'Database Error',
                         'err_msg' => $ex->getMessage(),
-                        'err_location' => 'During initial registration'
+                        'err_location' => 'During initial registration',
+                        'registration_no' => $registration_no
                       );
-                      DB::table($this->error_log)->insert($values);
+                      DB::table($this->error_log)->insert($database_error_log);
                       return response()->json([
                         'status' => false,
                         'message' => 'Database Error Occured',
                         'errors' => $ex->getMessage()
                     ],200);
                   }
-
               /* send mail using smtp */
             }
             else {
