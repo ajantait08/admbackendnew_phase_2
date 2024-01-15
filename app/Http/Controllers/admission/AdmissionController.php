@@ -32,6 +32,7 @@ class AdmissionController extends Controller
     public $program="adm_phdef_program_ms";
     public $appl_ms="adm_phdef_appl_ms";
     public $email_log="adm_phdef_email_log";
+    public $error_log="adm_phdef_error_log";
 
     public function register_user(Request $request){
 
@@ -50,8 +51,10 @@ class AdmissionController extends Controller
                 'last_name' => 'nullable|alpha_num:ascii',
                 'pwd' => 'required|alpha_num:ascii',
                 'category' => 'required|alpha_num:ascii',
-                'email' => 'required|email|unique:adm_phdef_registration,email',
-                'mobile' => 'required|regex:/[0-9]{10}/|unique:adm_phdef_registration,mobile',
+                //'email' => 'required|email|unique:adm_phdef_registration,email',
+                'email' => 'required|email',
+                //'mobile' => 'required|regex:/[0-9]{10}/|unique:adm_phdef_registration,mobile',
+                'mobile' => 'required|numeric|regex:/[0-9]{10}/',
                 'gender' => 'required|regex:/^[a-zA-Z]*$/',
                 'dob' => 'required|date_format:d-m-Y',
                 'father_name' => 'nullable|regex:/^[a-zA-Z0-9\s\.]*$/',
@@ -86,16 +89,16 @@ class AdmissionController extends Controller
               if ($m_email) {
                 return response()->json([
                   'status' => false,
-                  'message' => 'Registration already done using same Email !',
-                  'error' => 'Email Already Exists'
+                  'message' => 'Email Already Exists',
+                  'error' => 'Registration already done using same Email !'
               ],200);
               }
 
               if ($c_blind == '') {
                 return response()->json([
                   'status' => false,
-                  'message' => 'Color Blindness/Uniocularity field is mandatory!',
-                  'error' => 'Color Blindness/Uniocularity'
+                  'message' => 'Color Blindness/Uniocularity',
+                  'error' => 'Color Blindness/Uniocularity field is mandatory!'
                 ],200);
               }
 
@@ -103,12 +106,12 @@ class AdmissionController extends Controller
               if ($m_mobile) {
                 return response()->json([
                   'status' => false,
-                  'message' => 'Registration already done using same Mobile !',
-                  'error' => 'Mobile Already Exists'
+                  'message' => 'Mobile Already Exists',
+                  'error' => 'Registration already done using same Mobile !'
               ],200);
               }
 
-              $get_details_reg = DB::select('SELECT MAX(id) AS `maxid` FROM `adm_phdef_registration`');
+              $get_details_reg = DB::select('SELECT MAX(id) AS `maxid` FROM `adm_phd_registration`');
               if (!empty($get_details_reg)) {
               $maxid = $get_details_reg[0]->maxid;
               $nemax = $maxid + 1;
@@ -138,28 +141,55 @@ class AdmissionController extends Controller
                 'created_by' => $email
               );
 
-              $name = $first_name . " " . $middle_name . " " . $last_name;
-              $user = User::create([
-                'registration_no' => $registration_no,
-                'name' => $name,
-                'email' => $email,
-                'password' => Hash::make($password)
-              ]);
-
-              $token = $user->createToken('myadmapptoken')->plainTextToken;
-
+               //$name = $first_name . " " . $middle_name . " " . $last_name;
+               $name = $first_name;
+               if ($middle_name != '') {
+               $name .= " " . $middle_name;
+               }
+               if ($last_name != '') {
+               $name .= " " . $last_name;
+               }
                try {
+                 $user = User::create([
+                   'name' => $name,
+                   'email' => $email,
+                   'registration_no' => $registration_no,
+                   'password' => bcrypt($password)
+                 ]);
+                $token = $user->createToken('phdefadmtoken')->plainTextToken;
+               } catch (\Exception $e) {
+                  return response()->json([
+                   'error' => 'User Authentication Failed',
+                   'message' => $e->getMessage(),
+                   'status' => 'false'
+                  ],200);
+               }
+              /* send mail using smtp */
+               $email_encode = rawurlencode($email);
+               $link = "http://localhost:3000/admission/phd/verify_email/" . $email_encode;
+               $data = ['registration_no' => $registration_no,'password' => $password,'link' => $link];
+               $user['to'] = 'testiitism@gmail.com';
                     /* send mail using smtp */
                    /* mail function start here */
                   $email_encode = rawurlencode($email);
                   $link = "http://localhost:3000/admission/phd/verify_email/" . $email_encode;
                   $data = ['registration_no' => $registration_no,'password' => $password,'link' => $link];
                   $user['to'] = 'ajanta.au@iitism.ac.in';
-                  $mail_response = Mail::send('mail',$data,function($messages) use ($user){
-                  $messages->to($user['to']);
-                  $messages->subject('Checking mail sent');
-                  $messages->from('noreply-phd@iitism.ac.in');
-                  });
+                  try {
+                    /* mail function start here */
+                   $mail_response = Mail::send('mail',$data,function($messages) use ($user){
+                   $messages->to($user['to']);
+                   $messages->subject('Checking mail sent');
+                   $messages->from('noreply-phd@iitism.ac.in');
+                   });
+                     }
+                catch (\Exception $e) {
+                       return response()->json([
+                         'status' => false,
+                         'message' => 'Mail Sending Error',
+                         'errors' => $ex->getMessage()
+                     ],200);
+                     }
                   /* mail function end here */
                   $time_date = date("M,d,Y h:i:s A");
                   $upval = array(
@@ -175,27 +205,24 @@ class AdmissionController extends Controller
                     'status' => 1,
                     'created_by' => $email,
                   );
+                  try {
+                    $result = DB::table($this->table_name)->insert($values);
+                    $msgok = DB::table($this->email_log)->insert($emlog);
+                    $update_sendmail = DB::table($this->table_name)->where('email',$email)->update($upval);
+                    } catch (QueryException $ex) {
+                      $database_error_log = array(
+                        'error_type' => 'Database Error',
+                        'err_msg' => $ex->getMessage(),
+                        'err_location' => 'During initial registration'
+                      );
+                      DB::table($this->error_log)->insert($values);
+                      return response()->json([
+                        'status' => false,
+                        'message' => 'Database Error Occured',
+                        'errors' => $ex->getMessage()
+                    ],200);
+                  }
 
-                  $result = DB::table($this->table_name)->insert($values);
-
-                  // $lastQuery = DB::getQueryLog();
-                  // $lastQuery = end($lastQuery);
-                  // dd($lastQuery);
-                  $msgok = DB::table($this->email_log)->insert($emlog);
-                  $update_sendmail = DB::table($this->table_name)->where('email',$email)->update($upval);
-                  return response()->json([
-                    'status' => true,
-                    'message' => 'Registration Successful',
-                    'token' => $token
-                ],200);
-
-              } catch (\Exception $e) {
-                return response()->json([
-                  'status' => false,
-                  'message' => 'Please Contact Admin',
-                  'errors' => $ex->getMessage()
-              ],200);
-               }
               /* send mail using smtp */
             }
             else {
