@@ -39,10 +39,6 @@ class AdmissionController extends Controller
      try{
 
       DB::enableQueryLog();
-
-      // Your Eloquent or Query Builder code here
-
-
       $validateUser = Validator::make($request->all(),
             [
                 'salutation' => 'required|alpha_num:ascii',
@@ -163,9 +159,14 @@ class AdmissionController extends Controller
                    'message' => $e->getMessage(),
                    'status' => 'false'
                   ],200);
-                }
-
-                  $email_encode = $email;
+               }
+              /* send mail using smtp */
+               $link = "http://localhost:3000/admission/phd/verify_email/" . $email_encode;
+               $data = ['registration_no' => $registration_no,'password' => $password,'link' => $link];
+               $user['to'] = 'testiitism@gmail.com';
+                    /* send mail using smtp */
+                   /* mail function start here */
+                  $email_encode = rawurlencode($email);
                   $link = "http://localhost:3000/admission/phd/verify_email/" . $email_encode;
                   $data = ['registration_no' => $registration_no,'password' => $password,'link' => $link];
                   $user['to'] = 'ajanta.au@iitism.ac.in';
@@ -259,66 +260,64 @@ class AdmissionController extends Controller
   public function verify_email(Request $request){
 
     try{
-      DB::enableQueryLog();
-      $validateUser = Validator::make($request->all(),[
-         'email' => 'required|email',
-      ]);
+    DB::enableQueryLog();
+    $validateUser = Validator::make($request->all(),[
+       'email' => 'required|email',
+    ]);
 
-      if ($validateUser->fails()) {
-         return response()->json([
-           'status' => false,
-           'message' => 'validation error',
-           'errors' => $validateUser->errors()
-         ],200);
-      }
-      else {
-      $mdcode = $request['email'];
-      $decodegamil = rawurldecode($mdcode);
-      #select g.verification from adm_phd_registration g where g.email='".$email."'
-      $check = $this->Add_phd_registration_model->get_verify_email($this->cleanspecailcharacter($decodegamil));
-      $check_mail_id = $this->Add_phd_registration_model->check_email_exist($this->cleanspecailcharacter($decodegamil));
-      if ($check_mail_id == "not") {
-        redirect('admission/phd/Adm_phd_registration/login_view');
-        return false;
-      }
-      if ($check == 'Y') {
-        $this->load->view('admission/phd/adm_phd_error_page');
+    if ($validateUser->fails()) {
+       return response()->json([
+         'status' => false,
+         'message' => 'Validation Error',
+         'errors' => $validation->errors()
+       ],200);
+    }
+    $mdcode = $request['email'];
+    $decodegamil = rawurldecode($mdcode);
+    #select g.verification from adm_phd_registration g where g.email='".$email."'
+    $check = $this->Add_phd_registration_model->get_verify_email($this->cleanspecailcharacter($decodegamil));
+    $check_mail_id = $this->Add_phd_registration_model->check_email_exist($this->cleanspecailcharacter($decodegamil));
+    if ($check_mail_id == "not") {
+      redirect('admission/phd/Adm_phd_registration/login_view');
+      return false;
+    }
+    if ($check == 'Y') {
+      $this->load->view('admission/phd/adm_phd_error_page');
+    } else {
+
+      $time_date = date("M,d,Y h:i:s A");
+      $vupval = array(
+        'verification' => 'Y',
+        'verification_date_time' => $time_date,
+        'status' => 1
+      );
+
+      // if($email==$decodegamil)
+      if ($check_mail_id == 'ok') {
+
+        $update_sendmail = $this->Add_phd_registration_model->verify_email_time($vupval, $decodegamil);
+        $this->session->set_flashdata('success', 'Your Email Address is successfully verified! Please login to access your account!');
+        $data['val'] = "login";
+        $this->Adm_phd_header($data);
+        $this->load->view('admission/phd/adm_phd_login', $data);
+        $this->Adm_phd_footer();
       } else {
-
-        $time_date = date("M,d,Y h:i:s A");
-        $vupval = array(
-          'verification' => 'Y',
-          'verification_date_time' => $time_date,
-          'status' => 1
-        );
-
-        // if($email==$decodegamil)
-        if ($check_mail_id == 'ok') {
-
-          $update_sendmail = $this->Add_phd_registration_model->verify_email_time($vupval, $decodegamil);
-          $this->session->set_flashdata('success', 'Your Email Address is successfully verified! Please login to access your account!');
-          $data['val'] = "login";
-          $this->Adm_phd_header($data);
-          $this->load->view('admission/phd/adm_phd_login', $data);
-          $this->Adm_phd_footer();
-        } else {
-          $this->session->set_flashdata('error', 'Sorry there is error in verifying email!');
-          $data['val'] = "login";
-          $this->Adm_phd_header($data);
-          $this->load->view('admission/phd/adm_phd_login', $data);
-          $this->Adm_phd_footer();
-        }
-        }
+        $this->session->set_flashdata('error', 'Sorry there is error in verifying email!');
+        $data['val'] = "login";
+        $this->Adm_phd_header($data);
+        $this->load->view('admission/phd/adm_phd_login', $data);
+        $this->Adm_phd_footer();
       }
-       }
-       catch(QueryException $ex)
-       {
-          return response()->json([
-              'status' => false,
-              'message' => 'Please Contact Admin',
-              'errors' => $ex->getMessage()
-          ],200);
       }
+     }
+     catch(QueryException $ex)
+     {
+        return response()->json([
+            'status' => false,
+            'message' => 'Please Contact Admin',
+            'errors' => $ex->getMessage()
+        ],200);
+    }
   }
 
   public function apply_program(Request $request){
