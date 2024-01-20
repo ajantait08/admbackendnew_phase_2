@@ -272,53 +272,109 @@ class AdmissionController extends Controller
          ],200);
       }
       else {
-      $mdcode = $request['email'];
-      $decodegamil = rawurldecode($mdcode);
-      #select g.verification from adm_phd_registration g where g.email='".$email."'
-      $check = $this->Add_phd_registration_model->get_verify_email($this->cleanspecailcharacter($decodegamil));
-      $check_mail_id = $this->Add_phd_registration_model->check_email_exist($this->cleanspecailcharacter($decodegamil));
-      if ($check_mail_id == "not") {
-        redirect('admission/phd/Adm_phd_registration/login_view');
-        return false;
-      }
-      if ($check == 'Y') {
-        $this->load->view('admission/phd/adm_phd_error_page');
-      } else {
-
-        $time_date = date("M,d,Y h:i:s A");
-        $vupval = array(
-          'verification' => 'Y',
-          'verification_date_time' => $time_date,
-          'status' => 1
-        );
-
-        // if($email==$decodegamil)
-        if ($check_mail_id == 'ok') {
-
-          $update_sendmail = $this->Add_phd_registration_model->verify_email_time($vupval, $decodegamil);
-          $this->session->set_flashdata('success', 'Your Email Address is successfully verified! Please login to access your account!');
-          $data['val'] = "login";
-          $this->Adm_phd_header($data);
-          $this->load->view('admission/phd/adm_phd_login', $data);
-          $this->Adm_phd_footer();
-        } else {
-          $this->session->set_flashdata('error', 'Sorry there is error in verifying email!');
-          $data['val'] = "login";
-          $this->Adm_phd_header($data);
-          $this->load->view('admission/phd/adm_phd_login', $data);
-          $this->Adm_phd_footer();
-        }
-        }
-      }
-       }
-       catch(QueryException $ex)
-       {
+      $email = $request['email'];
+      $check = DB::SELECT("select g.verification from adm_phdef_registration g where g.email='".$email."'");
+      if (!empty($check)) {
+      $check_mail_id = DB::table('adm_phdef_registration')->where('email', $email)->count();
+      if ($check_mail_id > 0) {
+         if ($check == 'Y') {
           return response()->json([
-              'status' => false,
-              'message' => 'Please Contact Admin',
-              'errors' => $ex->getMessage()
+            'status' => false,
+            'error' => 'Email Verification Failed',
+            'message' => 'Sorry! there is error in verifying email'
           ],200);
+         }
+         else {
+          $time_date = date("M,d,Y h:i:s A");
+          $vupval = array(
+            'verification' => 'Y',
+            'verification_date_time' => $time_date,
+            'status' => 1
+          );
+          $affectedRows = DB::table('adm_phdef_registration')
+                          ->where('email', $email)
+                          ->update($vupval);
+          if ($affectedRows > 0) {
+            return response()->json([
+              'status' => true,
+              'message' => 'Email Verification Success',
+              //'message' => 'Your Email Address is successfully verified! Please login to access your account!'
+            ],200);
+          } else {
+            return response()->json([
+              'status' => false,
+              'error' => 'Email Verification Failed',
+              'message' => 'Sorry! there is error in verifying email'
+            ],200);
+          }
+         }
       }
+      else {
+        return response()->json([
+          'status' => false,
+          'error' => 'Email Verification Failed',
+          'message' => 'Sorry! there is error in verifying email'
+        ],200);
+      }
+        }
+        else {
+          return response()->json([
+            'status' => false,
+            'error' => 'Email Verification Failed',
+            'message' => 'Sorry! there is error in verifying email'
+          ],200);
+        }
+         }
+          }
+          catch(QueryException $ex)
+          {
+              return response()->json([
+                  'status' => false,
+                  'message' => 'Please Contact Admin',
+                  'errors' => $ex->getMessage()
+              ],200);
+          }
+  }
+
+  public function user_login(Request $request){
+    $request->ip(); exit;
+     $validateUser = validator::make($request->all(),[
+        'email' => 'required|email',
+        'password' => 'required|alpha_num:ascii|between:7,8',
+        'google_captcha' => 'required'
+     ]);
+     if ($validateUser->fails()) {
+        return response()->json([
+          'status' => false,
+          'message' => 'validation failed',
+          'error' => $validateUser->messages()
+        ],200);
+     }
+     else {
+      $googlecapturedata = array(
+        'secret' => env('GOOGLE_RECAPTCHA_SECRET'),
+        'response' => $request['google_captcha'],
+        'remoteip' => $request->ip());
+        try {
+          $verify = curl_init();
+          curl_setopt($verify, CURLOPT_URL,
+          "https://www.google.com/recaptcha/api/siteverify");
+          curl_setopt($verify, CURLOPT_POST, true);
+          curl_setopt($verify, CURLOPT_POSTFIELDS,
+                      http_build_query($googlecapturedata));
+          curl_setopt($verify, CURLOPT_SSL_VERIFYPEER, false);
+          curl_setopt($verify, CURLOPT_RETURNTRANSFER, true);
+          $response = curl_exec($verify);
+          print_r($response); exit;
+        } catch (\Exception $e) {
+          return response()->json([
+            'status' => false,
+            'message' => 'Please Contact Admin',
+            'error' => $e->getMessage()
+          ],200);
+        }
+     }
+
   }
 
   public function apply_program(Request $request){
