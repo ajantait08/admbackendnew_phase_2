@@ -19,6 +19,7 @@ Route::post('/register',[AuthController::class,'register']);
 Route::controller(AdmissionController::class)->group(function(){
     Route::post('register_user','register_user');
     Route::post('verify_email','verify_email');
+    Route::post('user_login','user_login');
 });
 
 Route::group(['middleware' => ['auth:sanctum']],function(){

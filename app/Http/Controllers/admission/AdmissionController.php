@@ -169,21 +169,21 @@ class AdmissionController extends Controller
                   $link = "http://localhost:3000/admission/phd/verify_email/" . $email_encode;
                   $data = ['registration_no' => $registration_no,'password' => $password,'link' => $link];
                   $user['to'] = 'ajanta.au@iitism.ac.in';
-                  try {
-                    /* mail function start here */
-                   $mail_response = Mail::send('mail',$data,function($messages) use ($user){
-                   $messages->to($user['to']);
-                   $messages->subject('Checking mail sent');
-                   $messages->from('noreply-phd@iitism.ac.in');
-                   });
-                     }
-                catch (\Exception $e) {
-                       return response()->json([
-                         'status' => false,
-                         'message' => 'Mail Sending Error',
-                         'errors' => $ex->getMessage()
-                     ],200);
-                     }
+                //   try {
+                //     /* mail function start here */
+                //    $mail_response = Mail::send('mail',$data,function($messages) use ($user){
+                //    $messages->to($user['to']);
+                //    $messages->subject('Checking mail sent');
+                //    $messages->from('noreply.admission.registration@iitism.ac.in');
+                //    });
+                //      }
+                // catch (\Exception $e) {
+                //        return response()->json([
+                //          'status' => false,
+                //          'message' => 'Mail Sending Error',
+                //          'errors' => $e->getMessage()
+                //      ],200);
+                //      }
                   /* mail function end here */
                   $time_date = date("M,d,Y h:i:s A");
                   $upval = array(
@@ -193,7 +193,7 @@ class AdmissionController extends Controller
                   $emlog = array(
                     'registration_no' => $registration_no,
                     'email_type' => 'Link verification',
-                    'email_from' => 'Noreply-phd@iitism.ac.in',
+                    'email_from' => 'noreply.admission.registration@iitism.ac.in',
                     'email_to' => $email,
                     'sent_date' => $time_date,
                     'status' => 1,
@@ -337,12 +337,19 @@ class AdmissionController extends Controller
   }
 
   public function user_login(Request $request){
-    $request->ip(); exit;
+    // return response()->json([
+    //   'status' => true,
+    //   'message' => 'testing reached here',
+    //   'error' => ''
+    // ],200);
+
      $validateUser = validator::make($request->all(),[
-        'email' => 'required|email',
+        'registration_no' => 'required|alpha_num:ascii',
         'password' => 'required|alpha_num:ascii|between:7,8',
-        'google_captcha' => 'required'
+        #'google_captcha' => 'required' /* comment for now open on valid request */
      ]);
+
+     #print_r($request->all()); exit;
      if ($validateUser->fails()) {
         return response()->json([
           'status' => false,
@@ -356,17 +363,137 @@ class AdmissionController extends Controller
         'response' => $request['google_captcha'],
         'remoteip' => $request->ip());
         try {
-          $verify = curl_init();
-          curl_setopt($verify, CURLOPT_URL,
-          "https://www.google.com/recaptcha/api/siteverify");
-          curl_setopt($verify, CURLOPT_POST, true);
-          curl_setopt($verify, CURLOPT_POSTFIELDS,
-                      http_build_query($googlecapturedata));
-          curl_setopt($verify, CURLOPT_SSL_VERIFYPEER, false);
-          curl_setopt($verify, CURLOPT_RETURNTRANSFER, true);
-          $response = curl_exec($verify);
-          print_r($response); exit;
-        } catch (\Exception $e) {
+          // $verify = curl_init();
+          // curl_setopt($verify, CURLOPT_URL,
+          // "https://www.google.com/recaptcha/api/siteverify");
+          // curl_setopt($verify, CURLOPT_POST, true);
+          // curl_setopt($verify, CURLOPT_POSTFIELDS,
+          //             http_build_query($googlecapturedata));
+          // curl_setopt($verify, CURLOPT_SSL_VERIFYPEER, false);
+          // curl_setopt($verify, CURLOPT_RETURNTRANSFER, true);
+          // $response = curl_exec($verify);
+          // $status = json_decode($response);
+          $registration_no = $request['registration_no'];
+          $password = $request['password'];
+          $check_registration_number = DB::table('adm_phdef_registration')->where('registration_no', $registration_no)->first();
+          #print_r($check_registration_number); exit;
+          if (empty($check_registration_number)) {
+            return response()->json([
+              'status' => false,
+              'error' => 'You have not done Registeration please first do registration',
+              'message' => 'Registration Details Not Found'
+            ],200);
+          }
+          else {
+            if ($check_registration_number->verification == '') {
+               return response()->json([
+                'status' => false,
+                'error' => 'You have not verify your email please verified it other wise you not allow to login',
+                'message' => 'Email Not Verified'
+               ],200);
+            }
+            else {
+              $user = User::where('registration_no', $request['registration_no'])->first();
+              if (! $user || ! Hash::check($request['password'], $user->password)) {
+                return response()->json([
+                  'status' => false,
+                  'error' => 'Either Email or Password is Invalid',
+                  'message' => 'Invalid login credentials'
+                 ],200);
+            }
+            else {
+              try {
+              $token = $user->createToken('phdefadmtoken')->plainTextToken;
+              $data1 = array(
+                'registration_no' => $request['registration_no'],
+                'password' => $request['password'],
+                'verification' => 'Y'
+              );
+              $data = array(
+                'registration_no' => $request['registration_no']
+              );
+              $login = DB::table('adm_phdef_registration')->where($data1)->first();
+              $val_reg = DB::table('adm_phdef_registration')->where($data)->first();
+              $email = $val_reg->email;
+              $name = $val_reg->first_name . ' ' . $val_reg->middle_name . ' ' . $val_reg->last_name;
+              $registration_no = $val_reg->registration_no;
+              if (!empty($login)) {
+                $userdata = array(
+                  'email' => $email,
+                  'status' => 'login',
+                  'name' => $name,
+                  'registration_no' => $registration_no,
+                  'login_type' => 'Phdef',
+                  'token' => $token
+                );
+              }
+              $application = DB::table('adm_phdef_appl_ms')->where($data)->first();
+              if (!empty($application)) {
+              if ($application->payment_status == 'Y') {
+                 return response()->json([
+                  'status' => true,
+                  'message' => 'Payment Success'],200);
+              }
+              else {
+                $currentdate = date("Y/m/d");
+                $closedate = "2028-04-28";
+                $currentdate = strtotime($currentdate);
+                $closedate = strtotime($closedate);
+                if ($currentdate > $closedate) {
+                return response()->json([
+                  'status' => false,
+                  'error' => 'The last date of applying in Ph.d. Admission portal is over.There is no fully submitted/paid application form for this application registration number',
+                  'message' => 'login failed'
+                ]);
+                } else {
+                  return response()->json([
+                    'status' => true,
+                    'message' => 'user_dashboard',
+                    'userdata' => $userdata
+                  ],200);
+                }
+                // $this->session->set_userdata('user_dashboard', 'user_dashboard');
+                // redirect('admission/phdef/Adm_phdef_applicant_home');
+                // redirect('admission/phdef/Adm_phdef_user_dashboard');
+            }
+            }
+            else {
+                $currentdate = date("Y/m/d");
+                $closedate = "2028-04-28";
+                $currentdate = strtotime($currentdate);
+                $closedate = strtotime($closedate);
+                if ($currentdate > $closedate) {
+                return response()->json([
+                  'status' => false,
+                  'error' => 'The last date of applying in Ph.d. Admission portal is over.There is no fully submitted/paid application form for this application registration number',
+                  'message' => 'login failed'
+                ]);
+                } else {
+                  return response()->json([
+                    'status' => true,
+                    'message' => 'user_dashboard',
+                  ]);
+                }
+            }
+          }
+          catch (Exception $e) {
+            $database_error_log = array(
+              'error_type' => 'Database Error',
+              'err_msg' => $e->getMessage(),
+              'err_location' => 'During Login process',
+              'registration_no' => $registration_no
+            );
+            DB::table($this->error_log)->insert($database_error_log);
+            return response()->json([
+              'status' => false,
+              'message' => 'Database Error Occured',
+              'errors' => $e->getMessage()
+          ],200);
+          }
+        }
+          #echo $check_registration_number->registration_no;
+          #$check_registration_number = $this->Add_phdef_registration_model->check_registration_no(trim($this->input->post('user_name')));
+        }}} catch (\Exception $e) {
           return response()->json([
             'status' => false,
             'message' => 'Please Contact Admin',
