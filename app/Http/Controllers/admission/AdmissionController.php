@@ -446,6 +446,7 @@ class AdmissionController extends Controller
                   'message' => 'login failed'
                 ]);
                 } else {
+                  print_r($userdata); exit;
                   return response()->json([
                     'status' => true,
                     'message' => 'user_dashboard',
@@ -472,6 +473,7 @@ class AdmissionController extends Controller
                   return response()->json([
                     'status' => true,
                     'message' => 'user_dashboard',
+                    'userdata' => $userdata
                   ]);
                 }
             }

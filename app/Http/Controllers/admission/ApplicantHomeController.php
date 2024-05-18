@@ -30,7 +30,19 @@ class ApplicantHomeController extends Controller {
     public $email_log="adm_phdef_email_log";
     public $error_log="adm_phdef_error_log";
 
-    public function getAppHomeDetails(){
+    public function getAppHomeDetails(Request $request){
+        try{
 
+            print_r($request->all()); exit;
+
+        }
+        catch(QueryException $ex){
+            return response()->json([
+                'status' => false,
+                'message' => 'Please Contact Admin',
+                'errors' => $ex->getMessage()
+            ]);
+
+        }
     }
 }
