@@ -33,7 +33,7 @@ class ApplicantHomeController extends Controller {
     public function getAppHomeDetails(Request $request){
         try{
 
-            print_r($request->all()); exit;
+
 
         }
         catch(QueryException $ex){
